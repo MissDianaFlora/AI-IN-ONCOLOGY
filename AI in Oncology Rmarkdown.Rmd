@@ -1,0 +1,224 @@
+---
+title: "AI IN ONCOLOGY"
+author: "Diana Flora Namaemba"
+date: "2023-07-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Machine Learning Models
+
+## 1. Import Data
+
+```{r}
+library(readxl)
+Data <- read_excel("~/BMSF 1/YEAR 3/analysis 2023/Multiple Myeloma Data/ML Dataset.xlsx")
+View(Data)
+```
+
+##  2. Data Pre-processing
+
+##  Step 1: Checking Missing Data
+
+```{r}
+summary(is.na(Data$Ecog_index))
+summary(is.na(Data$`1st Regimen`))
+summary(is.na(Data$age))
+summary(is.na(Data$Sex))
+summary(is.na(Data$ISS_stage))
+summary(is.na(Data$renalfailure))
+summary(is.na(Data$anemia))
+summary(is.na(Data$`Bone Pain`))
+summary(is.na(Data$`remission status`))
+```
+## Step 2: Check the Data type
+
+```{r}
+is.numeric(Data$age)
+is.numeric(Data$`Survival Time (Months)`)
+is.factor(Data$Ecog_index)
+is.factor(Data$renalfailure)
+is.factor(Data$anemia)
+is.factor(Data$`Bone Pain`)
+is.factor(Data$`remission status`)
+is.factor(Data$ISS_stage)
+is.factor(Data$Sex)
+is.factor(Data$`1st Regimen`)
+is.factor(Data$y)
+
+```
+
+## Step 3: Convert to factor
+
+```{r}
+Data$Ecog_index = as.factor(Data$Ecog_index)
+Data$renalfailure = as.factor(Data$renalfailure)
+Data$anemia = as.factor(Data$anemia)
+Data$`Bone Pain` = as.factor(Data$`Bone Pain`)
+Data$`remission status` = as.factor(Data$`remission status`)
+Data$ISS_stage = as.factor(Data$ISS_stage)
+Data$Sex = as.factor(Data$Sex)
+Data$`1st Regimen` = as.factor(Data$`1st Regimen`)
+Data$y = as.factor(Data$y)
+
+```
+## Step 4: Convert to numeric
+
+```{r}
+Data$age = as.numeric(Data$age)
+Data$`Survival Time (Months)`= as.numeric(Data$`Survival Time (Months)`)
+Data$`Mcomponent_g/l` = as.numeric(Data$`Mcomponent_g/l`)
+
+```
+## Step 5: Checking for duplicates
+
+```{r}
+duplicated(Data$Hosp_ID)
+
+```
+
+## 3. Data Preparation
+
+```{r}
+# Keep only variables that you want to use (age, sex, ecog, regimen, remission status, bone pain, renal failure, hypercalcemia, anemia, survival status, survival time)
+dataset = Data[c(2,3,4,5,6,7,8,9,10,11,12,13,14)]
+
+```
+
+## 4. Building a Training Set and Test Set
+
+```{r}
+library(caTools)
+set.seed(123)
+split=sample.split(dataset$y, SplitRatio = 0.75)
+MMtraining_set=subset(dataset, split==TRUE)
+MMtest_set=subset(dataset, split==FALSE)
+
+```
+
+## 5. Feature Scaling
+
+```{r}
+# Convert non-numeric columns to numeric (if needed)
+MMtraining_set[, c(2,6,10)] <- sapply(MMtraining_set[, c(2,6,10)], as.numeric)
+MMtest_set[, c(2,6,10)] <- sapply(MMtest_set[, c(2,6,10)], as.numeric)
+
+
+# Now, scale the selected columns
+MMtraining_set[, c(2,6,10)] <- scale(MMtraining_set[, c(2,6,10)])
+MMtest_set[, c(2,6,10)] = scale(MMtest_set[, c(2,6,10)])
+
+```
+
+## 6. Fitting the Logistic Regression Model using the Training set Data
+
+```{r}
+
+logisticclassifier = glm(formula = y ~ ., family = binomial,data = MMtraining_set)
+summary(logisticclassifier)
+```
+## 7.Predicting the Test Set Results
+
+```{r}
+logistic_pred <- predict(logisticclassifier, type = 'response', newdata = MMtest_set[-1])
+
+# Converting the predicted values into 0 and 1
+logisticpred = ifelse(logistic_pred > 0.5, 1, 0)
+
+```
+
+## 8. Evaluating the predicted values using the confusion matrix
+The Confusion Matrix, counts the number of correct predictions and number of incorrect predictions
+
+```{r}
+#Convert y to a factor or vector using unlist()
+y <- as.factor(unlist(MMtest_set[, 1]))
+
+#Confusion Matrix
+cm = table(y, logisticpred)
+cm
+```
+
+## Some Predicted y values from the test set did not match the actual y values in the test set
+The number of correct predictions is 2
+The number of incorrect predictions is 3
+Other classifiers can do better in the predictions
+
+## Resolving this involves the following approaches:-
+I) Check for multicollinearity: Multicollinearity occurs when two or more predictor variables in your model are highly correlated, which can lead to unstable coefficient estimates. Use the cor() function to check the correlation between predictor variables and remove highly correlated variables if necessary.
+
+II) Regularization techniques: Consider using regularization techniques like Lasso (L1 regularization) or Ridge (L2 regularization) to reduce overfitting and improve model stability.
+
+III) Feature selection: If you have many predictor variables, consider using feature selection methods like stepwise regression or feature importance techniques to select the most relevant variables for your model.
+
+IV) Cross-validation: Use cross-validation to evaluate your model's performance on different subsets of data and get a better estimate of its predictive capabilities.
+
+V) Address perfect/quasi-complete separation: If your dataset has perfect or quasi-complete separation, you can use Firth's penalized likelihood logistic regression (logistf function from the logistf package) or exact logistic regression (elrm function from the elrm package) as alternatives to deal with separation issues.
+
+## Decision Tree- Classification Model
+```{r}
+library(rpart)
+
+```
+## Fitting the Decision Tree Classifier
+```{r}
+# Fitting the decision tree classifier
+decisiontreeclassifier = rpart(formula = y ~ ., data = MMtraining_set)
+
+# Summary of the decision tree classifier
+summary(decisiontreeclassifier)
+```
+
+## Predicting the Test Dataset Using Decision Tree
+```{r}
+# Predict the test dataset using the decision tree classifier
+decisionpred = predict(decisiontreeclassifier, newdata = MMtest_set[-1], type = 'class')
+cm <- table(y, decisionpred)
+
+```
+
+## Random Forest Classification Model
+```{r}
+library(randomForest)
+
+```
+```{r}
+# Random Forest classification
+randomforestclassifier <- randomForest(x = MMtraining_set[-1], y = MMtraining_set$y, ntree = 10)
+
+# Summary of the random forest classifier
+summary(randomforestclassifier)
+```
+
+
+## Predicting the Test Dataset Using Random Forest
+```{r}
+# Predict the test dataset using the random forest classifier
+randompred <- predict(randomforestclassifier, newdata = MMtest_set[-1])
+
+# Evaluating the predicted values using the confusion matrix
+cm <- table(y, randompred)
+
+```
+
+## Evaluating Classification Models
+There are several ways to evaluate classification models. Here are some ways:-
+1. False Positive and False negatives
+2. Accuracy Paradox
+3. CAP curve
+4. CAP curve Analysis
+## False Positive and False Negatives
+```{r}
+# Predict the test dataset using the random forest classifier
+randompred <- predict(randomforestclassifier, newdata = MMtest_set[-1])
+
+# Evaluating the predicted values using the confusion matrix
+cm <- table(y, randompred)
+
+```
+
+
+
